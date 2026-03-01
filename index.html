@@ -12,67 +12,65 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Daily Points">
 
-  <!-- iOS icon (後で追加でOK) -->
-  <!-- <link rel="apple-touch-icon" href="icons/icon-180.png"> -->
-
   <style>
-    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;max-width:820px;margin:24px auto;padding:0 16px;}
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;max-width:860px;margin:24px auto;padding:0 16px;}
     h1{font-size:20px;margin:0 0 10px;}
-    .sub{color:#555;margin:0 0 18px;font-size:14px;line-height:1.4}
-    .box{border:1px solid #ddd;border-radius:14px;padding:12px;margin:12px 0;}
-    .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center;justify-content:space-between}
-    label{display:flex;gap:8px;align-items:center}
-    input[type="number"]{width:90px;padding:6px;border-radius:10px;border:1px solid #ccc}
-    button{padding:10px 14px;border-radius:12px;border:1px solid #ccc;background:#fff;cursor:pointer}
-    .result{font-size:18px}
-    .win{font-weight:800}
+    .sub{color:#555;margin:0 0 16px;font-size:14px;line-height:1.4}
     .pill{display:inline-block;padding:4px 10px;border-radius:999px;border:1px solid #ddd;font-size:12px;color:#444}
     .topbar{display:flex;gap:10px;align-items:center;justify-content:space-between}
     #installBtn{display:none}
+
+    .box{border:1px solid #ddd;border-radius:14px;padding:12px;margin:12px 0;}
+    .taskRow{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:8px 6px;border-top:1px dashed #eee}
+    .taskRow:first-child{border-top:none}
+    .left{display:flex;gap:10px;align-items:center;min-width:240px}
+    .meta{display:flex;gap:10px;align-items:center;color:#666;font-size:12px}
+    .done{opacity:0.55;text-decoration:line-through}
+    button{padding:10px 14px;border-radius:12px;border:1px solid #ccc;background:#fff;cursor:pointer}
+    .result{font-size:18px}
+    .win{font-weight:800}
+    .btnRow{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between;margin:12px 0}
+    .smallBtn{padding:6px 10px;border-radius:10px;font-size:12px}
+    .counts{display:flex;gap:10px;flex-wrap:wrap;font-size:13px}
+    .counts span{background:#f6f6f6;border:1px solid #e6e6e6;border-radius:999px;padding:4px 10px}
   </style>
 </head>
+
 <body>
   <div class="topbar">
     <h1>Daily Points</h1>
     <button id="installBtn">ホーム画面に追加</button>
   </div>
+
   <p class="sub">
     ルール：Total ≥ 60 かつ A/B/C それぞれ1つ以上。<br>
-    これはPWA対応（オフライン動作）。
+    チェックすると同じタスクが自動で増えて、何回でも達成できます。
     <span id="swStatus" class="pill">SW: -</span>
   </p>
 
   <div class="box">
+    <div class="counts" id="counts">—</div>
+  </div>
+
+  <div class="box">
     <h2>🧠 A：知的成長系</h2>
-    <div class="row">
-      <label><input type="checkbox" id="A_book"> 英語ビジネス書＋メモ (15)</label>
-      <label>基礎法学 個数 (2×個数): <input type="number" id="A_law" min="0" value="0"></label>
-      <label><input type="checkbox" id="A_psych"> 心理学実験＋メモ (20)</label>
-      <label><input type="checkbox" id="A_boki"> 簿記3級 30分 (10)</label>
-    </div>
+    <div id="listA"></div>
   </div>
 
   <div class="box">
     <h2>🗣 B：アウトプット系</h2>
-    <div class="row">
-      <label><input type="checkbox" id="B_news"> ニュース1分スピーキング (20)</label>
-      <label><input type="checkbox" id="B_5sent"> 英語5文アウトプット (10)</label>
-      <label><input type="checkbox" id="B_ai"> AI会話30分 (25)</label>
-    </div>
+    <div id="listB"></div>
   </div>
 
   <div class="box">
     <h2>🏃 C：身体・基礎系</h2>
-    <div class="row">
-      <label><input type="checkbox" id="C_test"> 英語試験対策 (10)</label>
-      <label><input type="checkbox" id="C_run"> 10分ランニング (5)</label>
-    </div>
+    <div id="listC"></div>
   </div>
 
-  <div class="row">
+  <div class="btnRow">
     <button id="calc">計算する</button>
     <button id="save">今日の結果を保存</button>
-    <button id="reset">リセット</button>
+    <button id="reset">今日をリセット</button>
     <div class="result" id="out">—</div>
   </div>
 
@@ -81,122 +79,272 @@
     <div id="history" class="sub">まだ保存なし</div>
   </div>
 
-  <script>
-    // ====== Points ======
-    const pts = {
-      A_book: 15, A_psych: 20, A_boki: 10,
-      B_news: 20, B_5sent: 10, B_ai: 25,
-      C_test: 10, C_run: 5,
-    };
+<script>
+/** =========================
+ *  Task definitions
+ *  ========================= */
+const TASKS = [
+  // A
+  { id:"A_book",  cat:"A", label:"英語ビジネス書＋メモ", pts:15 },
+  { id:"A_law",   cat:"A", label:"基礎法学（1個）",       pts:2  }, // 1回=2点
+  { id:"A_psych", cat:"A", label:"心理学実験（英語）＋メモ", pts:20 },
+  { id:"A_boki",  cat:"A", label:"簿記3級 30分",          pts:10 },
 
-    const idsCheckbox = ["A_book","A_psych","A_boki","B_news","B_5sent","B_ai","C_test","C_run"];
+  // B
+  { id:"B_news",  cat:"B", label:"ニュース1分スピーキング", pts:20 },
+  { id:"B_5sent", cat:"B", label:"英語5文アウトプット",     pts:10 },
+  { id:"B_ai",    cat:"B", label:"AIと会話 30分",          pts:25 },
 
-    function checked(id){ return document.getElementById(id).checked; }
-    function num(id){ return Number(document.getElementById(id).value || 0); }
+  // C
+  { id:"C_test",  cat:"C", label:"英語試験対策",           pts:10 },
+  { id:"C_run",   cat:"C", label:"10分ランニング",         pts:5  },
+];
 
-    function calcScore(){
-      const A = (checked("A_book")?pts.A_book:0) + (num("A_law")*2) + (checked("A_psych")?pts.A_psych:0) + (checked("A_boki")?pts.A_boki:0);
-      const B = (checked("B_news")?pts.B_news:0) + (checked("B_5sent")?pts.B_5sent:0) + (checked("B_ai")?pts.B_ai:0);
-      const C = (checked("C_test")?pts.C_test:0) + (checked("C_run")?pts.C_run:0);
-      const total = A+B+C;
-      const win = (total>=60 && A>0 && B>0 && C>0);
-      return {A,B,C,total,win};
+const listEls = {
+  A: document.getElementById("listA"),
+  B: document.getElementById("listB"),
+  C: document.getElementById("listC"),
+};
+
+const countsEl = document.getElementById("counts");
+
+/** =========================
+ *  State (today)
+ *  counts: {taskId: number}
+ *  ========================= */
+function blankCounts(){
+  const obj = {};
+  for(const t of TASKS) obj[t.id] = 0;
+  return obj;
+}
+let counts = blankCounts();
+
+/** =========================
+ *  Render helpers
+ *  ========================= */
+function taskById(id){ return TASKS.find(t => t.id === id); }
+
+function makeTaskRow(taskId){
+  const t = taskById(taskId);
+
+  const row = document.createElement("div");
+  row.className = "taskRow";
+  row.dataset.taskId = taskId;
+
+  const left = document.createElement("div");
+  left.className = "left";
+
+  const cb = document.createElement("input");
+  cb.type = "checkbox";
+  cb.className = "taskCheck";
+
+  const text = document.createElement("div");
+  text.innerHTML = `<strong>${t.label}</strong> <span class="pill">${t.pts}pt</span>`;
+
+  left.appendChild(cb);
+  left.appendChild(text);
+
+  const meta = document.createElement("div");
+  meta.className = "meta";
+  meta.innerHTML = `<span>今日: <strong id="cnt_${t.id}">${counts[t.id]}</strong>回</span>`;
+
+  row.appendChild(left);
+  row.appendChild(meta);
+
+  return row;
+}
+
+function ensureOneActivePerTask(){
+  // 各タスクごとに「未チェックの箱」が最低1つある状態にする
+  for(const t of TASKS){
+    const container = listEls[t.cat];
+    const rows = Array.from(container.querySelectorAll(`.taskRow[data-task-id="${t.id}"]`));
+    const hasActive = rows.some(r => !r.classList.contains("done"));
+    if(!hasActive){
+      container.appendChild(makeTaskRow(t.id));
     }
+  }
+}
 
-    function renderResult(){
-      const {A,B,C,total,win} = calcScore();
-      document.getElementById("out").innerHTML =
-        `A=${A} / B=${B} / C=${C} / Total=${total} → ` +
-        (win ? `<span class="win">WIN</span>` : `LOSE`);
+function renderAll(){
+  // 初期描画：カテゴリごとに並べる
+  listEls.A.innerHTML = "";
+  listEls.B.innerHTML = "";
+  listEls.C.innerHTML = "";
+
+  for(const t of TASKS){
+    listEls[t.cat].appendChild(makeTaskRow(t.id));
+  }
+  updateCountsBadges();
+}
+
+function updateCountsBadges(){
+  // 上部のサマリー表示
+  const A = calcCat("A"), B = calcCat("B"), C = calcCat("C");
+  const total = A+B+C;
+  countsEl.innerHTML = `
+    <span>🧠A: ${A}</span>
+    <span>🗣B: ${B}</span>
+    <span>🏃C: ${C}</span>
+    <span>Total: <strong>${total}</strong></span>
+  `;
+
+  // 各行の「今日○回」表示も更新（同じIDが複数行にあるので全部更新）
+  for(const t of TASKS){
+    const els = document.querySelectorAll(`#cnt_${t.id}`);
+    els.forEach(el => el.textContent = counts[t.id]);
+  }
+}
+
+/** =========================
+ *  Scoring
+ *  ========================= */
+function calcCat(cat){
+  let sum = 0;
+  for(const t of TASKS){
+    if(t.cat === cat) sum += counts[t.id] * t.pts;
+  }
+  return sum;
+}
+
+function calcScore(){
+  const A = calcCat("A");
+  const B = calcCat("B");
+  const C = calcCat("C");
+  const total = A+B+C;
+  const win = (total>=60 && A>0 && B>0 && C>0);
+  return {A,B,C,total,win};
+}
+
+function renderResult(){
+  const {A,B,C,total,win} = calcScore();
+  document.getElementById("out").innerHTML =
+    `A=${A} / B=${B} / C=${C} / Total=${total} → ` +
+    (win ? `<span class="win">WIN</span>` : `LOSE`);
+}
+
+/** =========================
+ *  Behavior: infinite checkboxes
+ *  ========================= */
+function onCheck(e){
+  const cb = e.target;
+  if(!cb.classList.contains("taskCheck")) return;
+  if(!cb.checked) return;
+
+  const row = cb.closest(".taskRow");
+  const taskId = row.dataset.taskId;
+
+  // 1) count +1
+  counts[taskId] += 1;
+
+  // 2) mark this row done (固定)
+  row.classList.add("done");
+  cb.disabled = true;
+
+  // 3) add a fresh row for the same task (so you can do it again)
+  const t = taskById(taskId);
+  listEls[t.cat].appendChild(makeTaskRow(taskId));
+
+  updateCountsBadges();
+  renderResult();
+}
+
+document.addEventListener("change", onCheck);
+
+/** =========================
+ *  Local history (device only)
+ *  ========================= */
+const KEY = "dailyPointsHistory_v2";
+
+function loadHistory(){
+  try { return JSON.parse(localStorage.getItem(KEY) || "[]"); }
+  catch { return []; }
+}
+function saveHistory(list){
+  localStorage.setItem(KEY, JSON.stringify(list));
+}
+function todayStr(){
+  const d = new Date();
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth()+1).padStart(2,'0');
+  const dd = String(d.getDate()).padStart(2,'0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+function renderHistory(){
+  const list = loadHistory().slice().reverse();
+  const el = document.getElementById("history");
+  if(list.length===0){ el.textContent = "まだ保存なし"; return; }
+  el.innerHTML = list.slice(0,20).map(item =>
+    `${item.date} — Total ${item.total} (${item.win ? "WIN" : "LOSE"})`
+  ).join("<br>");
+}
+
+document.getElementById("calc").addEventListener("click", () => {
+  updateCountsBadges();
+  renderResult();
+});
+
+document.getElementById("save").addEventListener("click", () => {
+  const {total,win} = calcScore();
+  const date = todayStr();
+  const list = loadHistory();
+
+  // 同じ日があれば上書き
+  const idx = list.findIndex(x => x.date === date);
+  const entry = {date,total,win, counts}; // countsも保存（将来の分析用）
+  if(idx>=0) list[idx] = entry;
+  else list.push(entry);
+
+  saveHistory(list);
+  renderHistory();
+  renderResult();
+});
+
+document.getElementById("reset").addEventListener("click", () => {
+  // 今日のカウントを全部0にして、UIも初期化
+  counts = blankCounts();
+  renderAll();
+  updateCountsBadges();
+  document.getElementById("out").textContent = "—";
+});
+
+/** =========================
+ *  PWA: Service Worker
+ *  ========================= */
+const swStatus = document.getElementById("swStatus");
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", async () => {
+    try {
+      await navigator.serviceWorker.register("./service-worker.js");
+      swStatus.textContent = "SW: ready";
+    } catch {
+      swStatus.textContent = "SW: failed";
     }
+  });
+} else {
+  swStatus.textContent = "SW: n/a";
+}
 
-    // ====== Local history (device only) ======
-    const KEY = "dailyPointsHistory_v1";
+/** Android install button */
+let deferredPrompt = null;
+const installBtn = document.getElementById("installBtn");
+window.addEventListener("beforeinstallprompt", (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  installBtn.style.display = "inline-block";
+});
+installBtn.addEventListener("click", async () => {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
+  await deferredPrompt.userChoice;
+  deferredPrompt = null;
+  installBtn.style.display = "none";
+});
 
-    function loadHistory(){
-      try { return JSON.parse(localStorage.getItem(KEY) || "[]"); }
-      catch { return []; }
-    }
-    function saveHistory(list){
-      localStorage.setItem(KEY, JSON.stringify(list));
-    }
-    function todayStr(){
-      const d = new Date();
-      const yyyy = d.getFullYear();
-      const mm = String(d.getMonth()+1).padStart(2,'0');
-      const dd = String(d.getDate()).padStart(2,'0');
-      return `${yyyy}-${mm}-${dd}`;
-    }
-    function renderHistory(){
-      const list = loadHistory().slice().reverse();
-      const el = document.getElementById("history");
-      if(list.length===0){ el.textContent = "まだ保存なし"; return; }
-      el.innerHTML = list.slice(0,20).map(item =>
-        `${item.date} — Total ${item.total} (${item.win ? "WIN" : "LOSE"})`
-      ).join("<br>");
-    }
-
-    document.getElementById("calc").addEventListener("click", () => {
-      renderResult();
-    });
-
-    document.getElementById("save").addEventListener("click", () => {
-      const {total,win} = calcScore();
-      const date = todayStr();
-      const list = loadHistory();
-
-      // 同じ日があれば上書き
-      const idx = list.findIndex(x => x.date === date);
-      const entry = {date,total,win};
-      if(idx>=0) list[idx] = entry;
-      else list.push(entry);
-
-      saveHistory(list);
-      renderHistory();
-      renderResult();
-    });
-
-    document.getElementById("reset").addEventListener("click", () => {
-      idsCheckbox.forEach(id=>document.getElementById(id).checked=false);
-      document.getElementById("A_law").value = 0;
-      document.getElementById("out").textContent = "—";
-    });
-
-    // 初期描画
-    renderHistory();
-
-    // ====== PWA: Service Worker ======
-    const swStatus = document.getElementById("swStatus");
-    if ("serviceWorker" in navigator) {
-      window.addEventListener("load", async () => {
-        try {
-          await navigator.serviceWorker.register("./service-worker.js");
-          swStatus.textContent = "SW: ready";
-        } catch (e) {
-          swStatus.textContent = "SW: failed";
-        }
-      });
-    } else {
-      swStatus.textContent = "SW: n/a";
-    }
-
-    // ====== PWA: Install prompt (Android/Chrome系) ======
-    let deferredPrompt = null;
-    const installBtn = document.getElementById("installBtn");
-
-    window.addEventListener("beforeinstallprompt", (e) => {
-      e.preventDefault();
-      deferredPrompt = e;
-      installBtn.style.display = "inline-block";
-    });
-
-    installBtn.addEventListener("click", async () => {
-      if (!deferredPrompt) return;
-      deferredPrompt.prompt();
-      await deferredPrompt.userChoice;
-      deferredPrompt = null;
-      installBtn.style.display = "none";
-    });
-  </script>
+/** init */
+renderAll();
+updateCountsBadges();
+renderHistory();
+</script>
 </body>
 </html>
